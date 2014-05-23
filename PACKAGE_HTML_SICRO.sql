@@ -131,16 +131,16 @@ END header;
 
 PROCEDURE cpu(
     p_cod_grupo IN varchar2,
-p_cod_compos IN varchar2,
-p_cod_tipo IN varchar2,
-p_classe_ser IN varchar2,
-p_cod_ident IN varchar2,
-p_DENOMINACA in varchar2,
-p_dsc_tipo_cpu IN varchar2,
-p_data_ref in varchar2,
-p_dsc_regiao in varchar2,
-p_prod_equip in varchar2,
-p_und_prod in varchar2)
+    p_cod_compos IN varchar2,
+    p_cod_tipo IN varchar2,
+    p_classe_ser IN varchar2,
+    p_cod_ident IN varchar2,
+    p_DENOMINACA in varchar2,
+    p_dsc_tipo_cpu IN varchar2,
+    p_data_ref in varchar2,
+    p_dsc_regiao in varchar2,
+    p_prod_equip in varchar2,
+    p_und_prod in varchar2)
 IS
 BEGIN
 
@@ -245,5 +245,206 @@ htp.p('
 
     ');
 end cpu;
+
+procedure equipamento( p_cod_grupo    IN VARCHAR2,
+    p_cod_compos   IN VARCHAR2,
+    p_cod_tipo     IN VARCHAR2,
+    p_classe_ser   IN VARCHAR2,
+    p_cod_ident    IN VARCHAR2,
+    p_arq_mdb    IN VARCHAR2)
+IS
+    BEGIN
+
+        c_nom_proc varchar2(50) := 'PKG_SP_EQUIPAMENTO';
+c_ref               NUMBER         := 1;
+    v_perc_improdutivo      NUMBER;
+
+
+htp.p('
+
+<TR>
+    <TD class="tr5 td7"><P class="p6 ft7">A - Equipamento</P></TD>
+    <TD class="tr5 td16"><P class="p1 ft1">&nbsp;</P></TD>
+    <TD colspan=2 class="tr5 td17"><P class="p7 ft7">Quantidade</P></TD>
+    <TD class="tr5 td18"><P class="p8 ft7">Utilização</P></TD>
+    <TD class="tr5 td17"><P class="p1 ft1">&nbsp;</P></TD>
+    <TD colspan=2 class="tr5 td19"><P class="p9 ft7">Custo Operacional</P></TD>
+    <TD class="tr5 td6"><P class="p10 ft8">Custo Horário</P></TD>
+</TR>
+
+    ')
+
+FOR c_eqp IN (SELECT /*+ index (s2 SER0020_IDX_GCTSI) */
+                                    s2.*
+                               FROM ser0020 s2
+                              WHERE s2.cod_grupo = p_cod_grupo
+                                AND s2.cod_compos = p_cod_compos
+                                AND s2.cod_tipo = p_cod_tipo
+                                AND s2.classe_ser = p_classe_ser
+                                AND s2.cod_ident = p_cod_ident
+                                AND s2.arq_mdb = p_arq_mdb)
+               LOOP
+                  v_cod_eqp := NULL;
+
+                  BEGIN
+                     SELECT eq.cod
+                       INTO v_cod_eqp
+                       FROM equipamento eq
+                      WHERE eq.cod_equip_ref = c_eqp.equipament
+                        AND eq.cod_referencia = c_ref;
+                  EXCEPTION
+                     WHEN NO_DATA_FOUND
+                     THEN
+                        v_cod_eqp := NULL;
+                        sp_insere_log (   TO_CHAR (SYSDATE,
+                                                   'dd/mm/rrrr hh24:mi:ss'
+                                                  )
+                                       || ' - SLCT EQP: '
+                                       || SQLERRM
+                                       || ' c_eqp.equipament '
+                                       || c_eqp.equipament
+                                       || ' c_ref '
+                                       || TO_CHAR (c_ref)
+                                       || ' p_cod_cpu '
+                                       || p_cod_cpu
+                                       || ' c_det.arq_mdb '
+                                       || c_det.arq_mdb
+                                       || ' c_data.data_ref '
+                                       || TO_CHAR (c_data.data_ref,
+                                                   'dd/mm/rrrr'
+                                                  ),
+                                       c_nom_proc
+                                      );
+                     WHEN OTHERS
+                     THEN
+                        sp_insere_log (   TO_CHAR (SYSDATE,
+                                                   'dd/mm/rrrr hh24:mi:ss'
+                                                  )
+                                       || ' - SLCT EQP: '
+                                       || SQLERRM
+                                       || ' c_eqp.equipament '
+                                       || c_eqp.equipament
+                                       || ' c_ref '
+                                       || TO_CHAR (c_ref)
+                                       || ' p_cod_cpu '
+                                       || p_cod_cpu
+                                       || ' c_det.arq_mdb '
+                                       || c_det.arq_mdb
+                                       || ' c_data.data_ref '
+                                       || TO_CHAR (c_data.data_ref,
+                                                   'dd/mm/rrrr'
+                                                  ),
+                                       c_nom_proc
+                                      );
+                        raise_application_error (-20001,
+                                                    SQLERRM
+                                                 || ' c_eqp.equipament '
+                                                 || c_eqp.equipament
+                                                 || ' c_ref '
+                                                 || TO_CHAR (c_ref)
+                                                 || ' p_cod_cpu '
+                                                 || p_cod_cpu
+                                                 || ' c_det.arq_mdb '
+                                                 || c_det.arq_mdb
+                                                 || ' c_data.data_ref '
+                                                 || TO_CHAR (c_data.data_ref,
+                                                             'dd/mm/rrrr'
+                                                            )
+                                                );
+                  END;
+
+                  IF v_cod_eqp IS NOT NULL
+                  THEN
+                    /* INSERT INTO equipamento_cpu
+                                 (cod, cod_equipamento,
+                                  cod_cpu_detalhe,
+                                  qtd_equipamento,
+                                  perc_operativo,
+                                  perc_improdutivo
+                                 )
+                          VALUES (equipamento_cpu_seq.NEXTVAL, v_cod_eqp,
+                                  v_seq_cpu_det,
+                                  TO_NUMBER (REPLACE (c_eqp.quantidade,
+                                                      ',',
+                                                      '.'
+                                                     )
+                                            ),
+                                  TO_NUMBER (REPLACE (c_eqp.utilizacao,
+                                                      ',',
+                                                      '.'
+                                                     )
+                                            ),
+                                    1
+                                  - TO_NUMBER (REPLACE (c_eqp.utilizacao,
+                                                        ',',
+                                                        '.'
+                                                       )
+                                              )
+                                 );
+
+                    */
+
+SELECT  ( 1 - TO_NUMBER (REPLACE (c_eqp.utilizacao, ',', '.' ) ))
+  INTO v_perc_improdutivo
+  FROM dual;
+
+                    htp.p('
+<TR>
+    <TD class="tr6 td10"><P class="p1 ft1">&nbsp;</P></TD>
+    <TD class="tr6 td11"><P class="p1 ft1">&nbsp;</P></TD>
+    <TD class="tr6 td20"><P class="p1 ft1">&nbsp;</P></TD>
+    <TD class="tr6 td21"><P class="p1 ft1">&nbsp;</P></TD>
+    <TD colspan=2 class="tr6 td22"><P class="p11 ft8">Operativa Improdutiva</P></TD>
+    <TD colspan=2 class="tr6 td14"><P class="p12 ft8">Operativo Improdutivo</P></TD>
+    <TD class="tr6 td15"><P class="p1 ft1">&nbsp;</P></TD>
+</TR>
+<TR>
+    <TD colspan=2 class="tr7 td0"><P class="p13 ft9">
+    '||
+        --E402 - Caminhão Carroceria - de madeira 15 t (210 kW)
+        c_eqp.EQUIPAMENT
+        ||' - '
+        
+    ||'
+    </P></TD>
+    <TD class="tr7 td1"><P class="p1 ft1">&nbsp;</P></TD>
+    <TD class="tr7 td2"><P class="p7 ft9">
+    '||
+        c_eqp.quantidade
+    ||'
+    </P></TD>
+    <TD class="tr7 td18"><P class="p14 ft9">
+    '||
+        c_eqp.utilizacao
+    ||'
+    </P></TD>
+    <TD class="tr7 td17"><P class="p15 ft9">
+    '||
+        v_perc_improdutivo
+    ||'
+    </P></TD>
+    <TD class="tr7 td4"><P class="p15 ft9">112,46</P></TD>
+    <TD class="tr7 td5"><P class="p16 ft9">14,17</P></TD>
+    <TD class="tr7 td6"><P class="p3 ft9">1,12</P></TD>
+</TR>
+<TR>
+    <TD class="tr8 td10"><P class="p1 ft1">&nbsp;</P></TD>
+    <TD class="tr8 td11"><P class="p1 ft1">&nbsp;</P></TD>
+    <TD class="tr8 td20"><P class="p1 ft1">&nbsp;</P></TD>
+    <TD class="tr8 td21"><P class="p1 ft1">&nbsp;</P></TD>
+    <TD class="tr8 td13"><P class="p1 ft1">&nbsp;</P></TD>
+    <TD colspan=3 class="tr8 td23"><P class="p17 ft7">Custo Horário de Equipamentos</P></TD>
+    <TD class="tr8 td15"><P class="p3 ft9">1,12</P></TD>
+</TR>
+
+    ');
+
+
+                  END IF;
+               END LOOP;
+
+
+    end;
+
 
 END PACKAGE_HTML_SICRO;
